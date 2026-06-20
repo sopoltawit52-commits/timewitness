@@ -174,6 +174,15 @@
         gpsInterval: null,
         notifiedEvents: new Set(),
 
+        // Dynamic camera controls & alarm states
+        currentFacingMode: 'user',
+        isDoubleCameraMode: false,
+        doubleCameraStep: 0, // 0 = single camera, 1 = capturing front, 2 = capturing back
+        doubleCameraPhotos: { front: null, back: null },
+        alarmAudioCtx: null,
+        alarmIntervalId: null,
+        isAlarmActive: false,
+
         init: function () {
             this.registerServiceWorker();
             this.bindEvents();
@@ -228,7 +237,55 @@
             document.getElementById('btn-trigger-test-alarm').addEventListener('click', () => {
                 showToast("แจ้งเตือนทดสอบสแกนนิ้ว", "นี่คือเสียงเตือนสแกนนิ้วกันลืมเข้าระบบพยานหลักฐาน", "warning");
             });
+            document.getElementById('btn-trigger-mobile-alarm').addEventListener('click', () => {
+                self.startAlarmActive("ทดสอบนาฬิกาปลุกบันทึกพยาน");
+            });
+            document.getElementById('btn-dismiss-alarm').addEventListener('click', () => {
+                self.stopAlarmActive();
+            });
             document.getElementById('btn-clear-today-logs').addEventListener('click', () => self.clearTodayLogs());
+
+            // Camera modal controls
+            document.getElementById('btn-switch-camera').addEventListener('click', () => {
+                if (self.isDoubleCameraMode) {
+                    showToast("โหมดกล้องคู่", "ในโหมดกล้องคู่ จะถ่ายกล้องหน้าแล้วสลับไปกล้องหลังให้อัตโนมัติ", "info");
+                    return;
+                }
+                self.toggleCameraFacing();
+            });
+
+            const cbDouble = document.getElementById('cb-double-camera');
+            if (cbDouble) {
+                cbDouble.addEventListener('change', function () {
+                    self.isDoubleCameraMode = this.checked;
+                    const indicator = document.getElementById('double-cam-indicator');
+                    const text = document.getElementById('double-cam-text');
+                    if (indicator && text) {
+                        if (self.isDoubleCameraMode) {
+                            indicator.style.borderColor = 'var(--color-cyan)';
+                            indicator.style.color = 'var(--color-cyan)';
+                            indicator.style.background = 'rgba(6, 182, 212, 0.15)';
+                            text.textContent = 'กล้องคู่ (หน้า+หลัง)';
+                            text.style.color = 'var(--color-cyan)';
+                        } else {
+                            indicator.style.borderColor = 'rgba(255,255,255,0.2)';
+                            indicator.style.color = 'var(--text-muted)';
+                            indicator.style.background = 'rgba(255,255,255,0.05)';
+                            text.textContent = 'กล้องเดี่ยว';
+                            text.style.color = 'var(--text-muted)';
+                        }
+                    }
+                    
+                    // If camera is open, restart the stream to reset step details
+                    const modal = document.getElementById('camera-capture-modal');
+                    if (modal && modal.classList.contains('active')) {
+                        self.doubleCameraStep = self.isDoubleCameraMode ? 1 : 0;
+                        self.doubleCameraPhotos = { front: null, back: null };
+                        self.currentFacingMode = self.isDoubleCameraMode ? 'user' : 'user';
+                        self.startWebcamStream();
+                    }
+                });
+            }
 
             // Filters
             document.getElementById('btn-apply-filters').addEventListener('click', () => self.renderHistory());
@@ -383,19 +440,19 @@
         openCameraModal: function () {
             const self = this;
             const modal = document.getElementById('camera-capture-modal');
-            const video = document.getElementById('webcam-element');
-            const canvas = document.getElementById('photo-canvas');
-            const loadingMsg = document.getElementById('camera-status-msg');
-            const placeholder = document.getElementById('camera-loading-placeholder');
             const confirmBtn = document.getElementById('btn-confirm-attendance');
+            const cbDouble = document.getElementById('cb-double-camera');
+
+            // Reset double camera state
+            self.isDoubleCameraMode = cbDouble ? cbDouble.checked : false;
+            self.doubleCameraStep = self.isDoubleCameraMode ? 1 : 0;
+            self.doubleCameraPhotos = { front: null, back: null };
             
+            // Default facingMode: front ('user')
+            self.currentFacingMode = 'user';
+
             // UI setup
             confirmBtn.disabled = true;
-            canvas.style.display = 'none';
-            video.style.display = 'none';
-            placeholder.style.display = 'flex';
-            loadingMsg.textContent = "กำลังเปิดกล้องหน้าโทรศัพท์...";
-            
             modal.classList.add('active');
 
             // GPS query in modal
@@ -410,10 +467,49 @@
                 gpsAcc.textContent = "";
             }
 
+            self.startWebcamStream();
+        },
+
+        startWebcamStream: function () {
+            const self = this;
+            const video = document.getElementById('webcam-element');
+            const canvas = document.getElementById('photo-canvas');
+            const loadingMsg = document.getElementById('camera-status-msg');
+            const placeholder = document.getElementById('camera-loading-placeholder');
+            const confirmBtn = document.getElementById('btn-confirm-attendance');
+            const stepPrompt = document.getElementById('camera-step-prompt');
+
+            // Stop any active camera streams
+            if (activeCameraStream) {
+                activeCameraStream.getTracks().forEach(track => track.stop());
+                activeCameraStream = null;
+            }
+
+            canvas.style.display = 'none';
+            video.style.display = 'none';
+            placeholder.style.display = 'flex';
+
+            // Update status messages
+            let cameraLabel = self.currentFacingMode === 'user' ? "กล้องหน้า (เซลฟี่)" : "กล้องหลัง (เครื่องสแกน)";
+            loadingMsg.textContent = `กำลังเปิด${cameraLabel}...`;
+
+            if (self.isDoubleCameraMode) {
+                stepPrompt.style.display = 'block';
+                if (self.doubleCameraStep === 1) {
+                    stepPrompt.textContent = "ขั้นตอนที่ 1: ถ่ายรูปกล้องหน้า (เซลฟี่)";
+                    self.currentFacingMode = 'user'; // Lock to user for step 1
+                } else if (self.doubleCameraStep === 2) {
+                    stepPrompt.textContent = "ขั้นตอนที่ 2: ถ่ายรูปกล้องหลัง (เครื่องสแกน)";
+                    self.currentFacingMode = 'environment'; // Lock to environment for step 2
+                }
+            } else {
+                stepPrompt.style.display = 'none';
+            }
+
             // Start webcam video streams
             if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
                 navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+                    video: { facingMode: self.currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
                     audio: false
                 })
                 .then(stream => {
@@ -426,16 +522,24 @@
                     console.error("Camera access error:", err);
                     loadingMsg.innerHTML = `<span style="color:var(--color-red);"><i class="fa-solid fa-triangle-exclamation"></i> ไม่สามารถเปิดกล้องได้ (กรุณาอนุญาตใช้กล้อง)</span>`;
                     
-                    // Fallback simulated camera canvas drawing so it is testable on headless run/denied environments
+                    // Fallback simulated camera canvas drawing
                     setTimeout(() => {
                         self.drawSimulatedSelfiePlaceholder();
                         placeholder.style.display = 'none';
-                        confirmBtn.disabled = false;
-                    }, 1500);
+                    }, 1000);
                 });
             } else {
                 loadingMsg.textContent = "ระบบเบราว์เซอร์ไม่รองรับกล้องถ่ายรูป";
+                setTimeout(() => {
+                    self.drawSimulatedSelfiePlaceholder();
+                    placeholder.style.display = 'none';
+                }, 1000);
             }
+        },
+
+        toggleCameraFacing: function () {
+            this.currentFacingMode = this.currentFacingMode === 'user' ? 'environment' : 'user';
+            this.startWebcamStream();
         },
 
         closeCameraModal: function () {
@@ -447,24 +551,51 @@
             document.getElementById('camera-capture-modal').classList.remove('active');
         },
 
-        // Snaps real photo, calls watermark engine overlay
         snapSelfiePhoto: function () {
+            const self = this;
             const video = document.getElementById('webcam-element');
             const canvas = document.getElementById('photo-canvas');
             const confirmBtn = document.getElementById('btn-confirm-attendance');
             
             if (!activeCameraStream && canvas.style.display === 'block') {
-                // If camera failed but simulated placeholder is loaded, do nothing
+                // If using simulated mode, click snap advances simulation manually
+                if (self.isDoubleCameraMode && self.doubleCameraStep === 1) {
+                    self.drawSimulatedSelfiePlaceholder();
+                } else if (self.isDoubleCameraMode && self.doubleCameraStep === 2) {
+                    self.drawSimulatedSelfiePlaceholder();
+                }
                 return;
             }
 
             if (!video.srcObject) return;
 
+            // Capture logic based on camera mode
+            if (self.isDoubleCameraMode && self.doubleCameraStep === 1) {
+                // Capture Step 1 (Front camera)
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = video.videoWidth || 640;
+                tempCanvas.height = video.videoHeight || 480;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
+                self.doubleCameraPhotos.front = tempCanvas.toDataURL('image/jpeg');
+
+                // Beep and alert user
+                playBeepSound('success');
+                showToast("กล้องหน้าสำเร็จ", "บันทึกรูปเซลฟี่แล้ว กำลังสลับไปกล้องหลัง...", "success", 2000);
+
+                // Switch to Back camera for Step 2
+                self.doubleCameraStep = 2;
+                self.currentFacingMode = 'environment';
+                
+                // Restart webcam stream for step 2
+                self.startWebcamStream();
+                return;
+            }
+
+            // Capture Step 2 (Back camera in Double mode) OR Single camera snap
             const ctx = canvas.getContext('2d');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-
-            // Draw video frame to canvas
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
             // Turn off camera stream instantly to save battery
@@ -475,16 +606,44 @@
             video.style.display = 'none';
             canvas.style.display = 'block';
 
-            // Draw watermark directly onto canvas!
-            this.drawWatermarkOverlay(canvas);
-            
-            capturedPhotoBase64 = canvas.toDataURL('image/jpeg');
-            confirmBtn.disabled = false;
+            if (self.isDoubleCameraMode && self.doubleCameraStep === 2) {
+                // Save Back camera image
+                self.doubleCameraPhotos.back = canvas.toDataURL('image/jpeg');
+
+                // Composite both images: Back is background, Front is PiP overlay
+                const pipW = Math.round(canvas.width * 0.28);
+                const pipH = Math.round(canvas.height * 0.28);
+                const pipX = canvas.width - pipW - Math.round(canvas.width * 0.03); // Right aligned
+                const pipY = Math.round(canvas.height * 0.03); // Top aligned
+                const borderSize = Math.max(2, Math.round(canvas.width * 0.006));
+
+                // Draw PiP white border frame
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(pipX - borderSize, pipY - borderSize, pipW + (borderSize * 2), pipH + (borderSize * 2));
+
+                // Draw PiP image
+                const imgFront = new Image();
+                imgFront.onload = function () {
+                    ctx.drawImage(imgFront, pipX, pipY, pipW, pipH);
+                    
+                    // Draw secure watermark
+                    self.drawWatermarkOverlay(canvas);
+                    
+                    capturedPhotoBase64 = canvas.toDataURL('image/jpeg');
+                    confirmBtn.disabled = false;
+                };
+                imgFront.src = self.doubleCameraPhotos.front;
+
+            } else {
+                // Normal Single Camera draw watermark directly
+                self.drawWatermarkOverlay(canvas);
+                capturedPhotoBase64 = canvas.toDataURL('image/jpeg');
+                confirmBtn.disabled = false;
+            }
             
             playBeepSound('success');
         },
 
-        // Watermark Overlay Draw engine
         drawWatermarkOverlay: function (canvas) {
             const ctx = canvas.getContext('2d');
             const now = new Date();
@@ -504,50 +663,151 @@
                 ? `LAT: ${currentGPSData.lat}, LNG: ${currentGPSData.lng} (+/- ${currentGPSData.accuracy}m)`
                 : "GPS COORDS: NOT DETECTED (MOCK ACTIVE)";
 
+            // Proportional sizes based on canvas size (solves disappearing watermark on high-res)
+            const barHeight = Math.round(canvas.height * 0.16); // 16% of height
+            const margin = Math.round(canvas.width * 0.03); // 3% margin
+            const titleSize = Math.max(14, Math.round(canvas.height * 0.035)); // 3.5%
+            const bodySize = Math.max(11, Math.round(canvas.height * 0.026)); // 2.6%
+            const badgeSize = Math.max(12, Math.round(canvas.height * 0.032)); // 3.2%
+            const smallSize = Math.max(8, Math.round(canvas.height * 0.020)); // 2.0%
+
             // Draw translucent black bar at bottom
-            const barHeight = 85;
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
             ctx.fillRect(0, canvas.height - barHeight, canvas.width, barHeight);
 
-            // Draw bottom border line
-            ctx.lineWidth = 4;
-            ctx.strokeStyle = '#06b6d4'; // Cyan neon line
+            // Draw bottom border line (Cyan neon)
+            const borderWidth = Math.max(2, Math.round(canvas.height * 0.008));
+            ctx.lineWidth = borderWidth;
+            ctx.strokeStyle = '#06b6d4';
             ctx.beginPath();
             ctx.moveTo(0, canvas.height - barHeight);
             ctx.lineTo(canvas.width, canvas.height - barHeight);
             ctx.stroke();
 
             // Font configurations
-            ctx.font = 'bold 15px Prompt, Arial';
+            ctx.textBaseline = 'middle';
+            
+            // Left text block (Verify logo and details)
             ctx.fillStyle = '#06b6d4'; // Cyan color
             ctx.textAlign = 'left';
-            ctx.fillText("TIMEWITNESS SECURE PROOF", 20, canvas.height - 58);
+            ctx.font = `bold ${titleSize}px Prompt, Arial, sans-serif`;
+            ctx.fillText("TIMEWITNESS SECURE PROOF", margin, canvas.height - (barHeight * 0.70));
 
-            ctx.font = 'bold 13px Outfit, Arial';
             ctx.fillStyle = '#f9fafb'; // White color
-            ctx.fillText(`TIMESTAMP: ${timestamp}`, 20, canvas.height - 35);
-            ctx.fillText(`COORDINATES: ${gpsCoords}`, 20, canvas.height - 15);
+            ctx.font = `bold ${bodySize}px Outfit, Arial, sans-serif`;
+            ctx.fillText(`TIMESTAMP: ${timestamp}`, margin, canvas.height - (barHeight * 0.44));
+            ctx.fillText(`COORDINATES: ${gpsCoords}`, margin, canvas.height - (barHeight * 0.18));
 
-            // Draw right aligned status badge
+            // Right aligned status badge
             ctx.textAlign = 'right';
-            ctx.font = 'bold 14px Prompt, Arial';
             ctx.fillStyle = '#10b981'; // Emerald
-            ctx.fillText(modeText, canvas.width - 20, canvas.height - 58);
+            ctx.font = `bold ${badgeSize}px Prompt, Arial, sans-serif`;
+            ctx.fillText(modeText, canvas.width - margin, canvas.height - (barHeight * 0.70));
             
-            ctx.font = '10px Outfit';
-            ctx.fillStyle = '#9ca3af';
-            ctx.fillText("VERIFIED BY DEVICE SENSORS", canvas.width - 20, canvas.height - 18);
+            ctx.fillStyle = '#9ca3af'; // Gray
+            ctx.font = `bold ${smallSize}px Outfit, Arial, sans-serif`;
+            ctx.fillText("VERIFIED BY DEVICE SENSORS", canvas.width - margin, canvas.height - (barHeight * 0.22));
         },
 
-        // Fallback simulated camera view drawer (if permission blocked or headless environment)
         drawSimulatedSelfiePlaceholder: function () {
+            const self = this;
             const canvas = document.getElementById('photo-canvas');
             const ctx = canvas.getContext('2d');
+            const confirmBtn = document.getElementById('btn-confirm-attendance');
             canvas.width = 640;
             canvas.height = 480;
             canvas.style.display = 'block';
 
-            // Background
+            if (self.isDoubleCameraMode && self.doubleCameraStep === 1) {
+                // Step 1: Draw simulated front camera (Selfie)
+                ctx.fillStyle = '#0f172a'; // dark background
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw face shape
+                ctx.beginPath();
+                ctx.arc(canvas.width / 2, canvas.height / 2 - 20, 100, 0, Math.PI * 2);
+                ctx.fillStyle = 'rgba(6, 182, 212, 0.15)';
+                ctx.fill();
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = '#06b6d4';
+                ctx.stroke();
+
+                // Draw face elements
+                ctx.fillStyle = '#06b6d4';
+                ctx.beginPath();
+                ctx.arc(canvas.width / 2 - 35, canvas.height / 2 - 40, 8, 0, Math.PI * 2);
+                ctx.arc(canvas.width / 2 + 35, canvas.height / 2 - 40, 8, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.strokeStyle = '#06b6d4';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(canvas.width / 2, canvas.height / 2, 45, 0, Math.PI);
+                ctx.stroke();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 20px Prompt, Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText("SIMULATED FRONT CAMERA (SELFIE)", canvas.width / 2, canvas.height / 2 + 120);
+
+                self.doubleCameraPhotos.front = canvas.toDataURL('image/jpeg');
+
+                // Advance to step 2 after a delay
+                self.doubleCameraStep = 2;
+                self.currentFacingMode = 'environment';
+                
+                setTimeout(() => {
+                    self.startWebcamStream();
+                }, 1200);
+                return;
+            }
+
+            if (self.isDoubleCameraMode && self.doubleCameraStep === 2) {
+                // Step 2: Draw simulated back camera (Machine)
+                ctx.fillStyle = '#090d16'; 
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // Draw barcode scanner box
+                ctx.fillStyle = '#1e293b';
+                ctx.fillRect(canvas.width / 2 - 120, canvas.height / 2 - 100, 240, 200);
+
+                ctx.strokeStyle = '#ef4444'; // Scanner red laser
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.moveTo(canvas.width / 2 - 110, canvas.height / 2);
+                ctx.lineTo(canvas.width / 2 + 110, canvas.height / 2);
+                ctx.stroke();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 18px Prompt, Arial';
+                ctx.textAlign = 'center';
+                ctx.fillText("SIMULATED BACK CAMERA (OFFICE SCANNER)", canvas.width / 2, canvas.height / 2 - 120);
+                ctx.fillText("FINGERPRINT MACHINE IN FOCUS", canvas.width / 2, canvas.height / 2 + 130);
+
+                self.doubleCameraPhotos.back = canvas.toDataURL('image/jpeg');
+
+                // Composite Front selfie over it
+                const pipW = Math.round(canvas.width * 0.28);
+                const pipH = Math.round(canvas.height * 0.28);
+                const pipX = canvas.width - pipW - 20;
+                const pipY = 20;
+
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(pipX - 4, pipY - 4, pipW + 8, pipH + 8);
+
+                const imgFront = new Image();
+                imgFront.onload = function () {
+                    ctx.drawImage(imgFront, pipX, pipY, pipW, pipH);
+                    self.drawWatermarkOverlay(canvas);
+                    capturedPhotoBase64 = canvas.toDataURL('image/jpeg');
+                    confirmBtn.disabled = false;
+                    canvas.style.display = 'block';
+                };
+                imgFront.src = self.doubleCameraPhotos.front;
+                return;
+            }
+
+            // Normal single camera simulation
             ctx.fillStyle = '#0b0f19';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -574,9 +834,118 @@
             ctx.strokeRect(canvas.width - 50, 30, 20, 40);
 
             // Watermark overlays
-            this.drawWatermarkOverlay(canvas);
+            self.drawWatermarkOverlay(canvas);
 
             capturedPhotoBase64 = canvas.toDataURL('image/jpeg');
+            confirmBtn.disabled = false;
+        },
+
+        // Alarm Alert functions
+        startAlarmActive: function (label = "ได้เวลาบันทึกเวลาทำงานแล้ว") {
+            if (this.isAlarmActive) return;
+            this.isAlarmActive = true;
+
+            // Show full screen alarm modal
+            const modal = document.getElementById('alarm-siren-modal');
+            const timeDisplay = document.getElementById('alarm-time-now-display');
+            if (modal) modal.classList.add('active');
+            if (timeDisplay) {
+                const now = new Date();
+                timeDisplay.textContent = now.toTimeString().split(' ')[0].substring(0, 5);
+            }
+
+            const self = this;
+
+            // Audio synthesis function using Web Audio API
+            function triggerSirenBeep() {
+                if (!self.isAlarmActive || !alarms.enableSound) return;
+                try {
+                    const AudioContext = window.AudioContext || window.webkitAudioContext;
+                    if (!AudioContext) return;
+                    if (!self.alarmAudioCtx || self.alarmAudioCtx.state === 'closed') {
+                        self.alarmAudioCtx = new AudioContext();
+                    }
+                    const ctx = self.alarmAudioCtx;
+                    if (ctx.state === 'suspended') {
+                        ctx.resume();
+                    }
+
+                    // Mobile alarm beep (double beep: beep beep)
+                    const playTone = (freq, startTime, duration) => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+
+                        gain.gain.setValueAtTime(0.15, startTime);
+                        gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+                        osc.type = 'square'; // harsher square wave for alarm siren
+                        osc.frequency.setValueAtTime(freq, startTime);
+                        osc.start(startTime);
+                        osc.stop(startTime + duration);
+                    };
+
+                    const nowTime = ctx.currentTime;
+                    playTone(987.77, nowTime, 0.15); // B5 note
+                    playTone(987.77, nowTime + 0.22, 0.15);
+                } catch (e) {
+                    console.warn("Alarm audio context error:", e);
+                }
+            }
+
+            // Vibration loop
+            function triggerVibration() {
+                if ('vibrate' in navigator) {
+                    navigator.vibrate([500, 200, 500, 200, 500]);
+                }
+            }
+
+            // Initial play
+            triggerSirenBeep();
+            triggerVibration();
+
+            // Loop every 1.5 seconds
+            this.alarmIntervalId = setInterval(() => {
+                triggerSirenBeep();
+                triggerVibration();
+            }, 1500);
+
+            // Also show native system push notification
+            if ('Notification' in window && Notification.permission === 'granted') {
+                navigator.serviceWorker.ready.then(registration => {
+                    registration.showNotification("TimeWitness Alarm Clock ⏰", {
+                        body: `ถึงเวลาเตือน: ${label}! กรุณากดลงเวลาบันทึกพยานในระบบทันที`,
+                        icon: 'logo.png', // Fallback
+                        vibrate: [500, 200, 500, 200, 500],
+                        requireInteraction: true,
+                        tag: 'timewitness-alarm'
+                    });
+                });
+            }
+        },
+
+        stopAlarmActive: function () {
+            this.isAlarmActive = false;
+            if (this.alarmIntervalId) {
+                clearInterval(this.alarmIntervalId);
+                this.alarmIntervalId = null;
+            }
+            if (this.alarmAudioCtx) {
+                try {
+                    this.alarmAudioCtx.close();
+                } catch (e) {}
+                this.alarmAudioCtx = null;
+            }
+            
+            // Close alarm modal
+            const modal = document.getElementById('alarm-siren-modal');
+            if (modal) modal.classList.remove('active');
+
+            // Cancel phone vibration
+            if ('vibrate' in navigator) {
+                navigator.vibrate(0);
+            }
         },
 
         // ==========================================================================
@@ -1191,6 +1560,7 @@
                 // Alarm 1: Check-in Reminder (e.g. 08:45)
                 const checkinKey = `${todayISO}_checkin_reminder`;
                 if (currentTimeStr === alarms.checkin && stepsCount === 0 && !self.notifiedEvents.has(checkinKey)) {
+                    self.startAlarmActive("เตือนสแกนนิ้วเข้างาน (Check-In)");
                     showToast("เตือนสแกนนิ้วเข้างาน (Check-In)", "ขณะนี้ถึงเวลาเตือนสแกนนิ้วเข้างานแล้ว กรุณากดปุ่มเพื่อบันทึกพยานหลักฐานพร้อมภาพถ่าย!", "danger", 15000);
                     self.notifiedEvents.add(checkinKey);
                 }
@@ -1198,6 +1568,7 @@
                 // Alarm 2: Lunch Break Reminder (e.g. 12:00)
                 const lunchKey = `${todayISO}_lunch_reminder`;
                 if (currentTimeStr === alarms.lunch && stepsCount === 1 && !self.notifiedEvents.has(lunchKey)) {
+                    self.startAlarmActive("เตือนสแกนนิ้วออกพักเที่ยง");
                     showToast("เตือนสแกนนิ้วออกพักเที่ยง", "สแกนนิ้วออกพักกลางวันเรียบร้อยแล้วหรือยัง? อย่าลืมกดลงประวัติพยานในแอปสำรองไว้นะ!", "warning", 12000);
                     self.notifiedEvents.add(lunchKey);
                 }
@@ -1205,6 +1576,7 @@
                 // Alarm 3: Break In Reminder (e.g. 12:55)
                 const breakinKey = `${todayISO}_breakin_reminder`;
                 if (currentTimeStr === alarms.breakin && stepsCount === 2 && !self.notifiedEvents.has(breakinKey)) {
+                    self.startAlarmActive("เตือนสแกนนิ้วกลับเข้าทำงาน");
                     showToast("เตือนสแกนนิ้วกลับเข้าทำงาน", "หมดเวลาพักเที่ยงแล้ว สแกนนิ้วกลับทำงานและกดยืนยันบันทึกพยานบนเครื่องไว้เลย!", "warning", 12000);
                     self.notifiedEvents.add(breakinKey);
                 }
@@ -1212,6 +1584,7 @@
                 // Alarm 4: Check-out Reminder (e.g. 18:00)
                 const checkoutKey = `${todayISO}_checkout_reminder`;
                 if (currentTimeStr === alarms.checkout && stepsCount === 3 && !self.notifiedEvents.has(checkoutKey)) {
+                    self.startAlarmActive("เตือนสแกนนิ้วออกงาน (Check-Out)");
                     showToast("เตือนสแกนนิ้วออกงาน (Check-Out)", "เลิกงานเรียบร้อยแล้ว สแกนนิ้วออกงานและอย่าลืมกดยืนยันพยานจบล็อกของวันนี้!", "danger", 15000);
                     self.notifiedEvents.add(checkoutKey);
                 }

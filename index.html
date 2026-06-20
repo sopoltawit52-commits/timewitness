@@ -196,13 +196,18 @@
                         <div class="card glass-card notification-demo-card">
                             <h3><i class="fa-solid fa-circle-info"></i> แจ้งเตือนสแกนนิ้วกันลืม</h3>
                             <p class="demo-tip">แอปจะส่งสัญญาณเตือนในโทรศัพท์ของคุณตามเวลาเข้า-ออกงาน เพื่อไม่ให้คุณลืมกดยืนยันพยานปากสำคัญ</p>
-                            <div class="demo-actions-grid">
-                                <button class="btn btn-secondary btn-sm" id="btn-trigger-test-alarm">
-                                    <i class="fa-solid fa-volume-high"></i> ทดสอบส่งเสียงแจ้งเตือน
+                            <div class="demo-actions-grid" style="grid-template-columns: 1fr; gap: 0.5rem;">
+                                <button class="btn btn-primary btn-sm" id="btn-trigger-mobile-alarm" style="background: linear-gradient(135deg, var(--color-purple), var(--color-amber)); width: 100%;">
+                                    <i class="fa-solid fa-bell"></i> ทดสอบระบบนาฬิกาปลุกมือถือ (เสียง+สั่น)
                                 </button>
-                                <button class="btn btn-outline btn-sm" id="btn-clear-today-logs" style="border-color:var(--color-red); color:var(--color-red);">
-                                    <i class="fa-solid fa-trash-can"></i> ล้างข้อมูลบันทึกวันนี้
-                                </button>
+                                <div style="display: flex; gap: 0.5rem; width: 100%;">
+                                    <button class="btn btn-secondary btn-sm" id="btn-trigger-test-alarm" style="flex: 1;">
+                                        <i class="fa-solid fa-volume-high"></i> ทดสอบเสียงเตือนสั้น
+                                    </button>
+                                    <button class="btn btn-outline btn-sm" id="btn-clear-today-logs" style="border-color:var(--color-red); color:var(--color-red); flex: 1;">
+                                        <i class="fa-solid fa-trash-can"></i> ล้างบันทึกวันนี้
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </section>
@@ -443,20 +448,38 @@
                     <div class="camera-preview-container">
                         <!-- Camera guideline bounds -->
                         <div class="camera-goggles-guide"></div>
+                        <!-- Step Indicator for Double Capture -->
+                        <div class="camera-step-prompt" id="camera-step-prompt" style="display:none; position:absolute; top:12px; left:12px; right:12px; background:rgba(9,13,22,0.9); padding:6px 12px; border-radius:6px; border:1px solid var(--color-cyan); color:#fff; text-align:center; font-size:0.85rem; font-weight:500; z-index:10; box-shadow: 0 4px 12px rgba(0,0,0,0.55);">
+                            ขั้นตอนที่ 1: ถ่ายรูปกล้องหน้า (เซลฟี่)
+                        </div>
                         <video id="webcam-element" autoplay playsinline muted></video>
                         <canvas id="photo-canvas" style="display:none;"></canvas>
                         
                         <div class="camera-placeholder" id="camera-loading-placeholder">
                             <i class="fa-solid fa-circle-notch fa-spin camera-placeholder-icon"></i>
-                            <p id="camera-status-msg">กำลังเปิดกล้องหน้าโทรศัพท์...</p>
+                            <p id="camera-status-msg">กำลังเปิดกล้อง...</p>
                         </div>
                     </div>
                     
-                    <div class="camera-controls">
+                    <div class="camera-controls" style="display:flex; justify-content:center; align-items:center; gap:2rem; width:100%; margin-top:1rem;">
+                        <!-- Switch Camera Button -->
+                        <button class="btn btn-secondary" id="btn-switch-camera" title="สลับกล้องหน้า/หลัง" style="border-radius: 50%; width: 48px; height: 48px; padding: 0; display:flex; justify-content:center; align-items:center; border: 1px solid rgba(255,255,255,0.2);">
+                            <i class="fa-solid fa-camera-rotate" style="font-size: 1.2rem;"></i>
+                        </button>
+
                         <!-- Capture Button -->
-                        <button class="btn btn-primary" id="btn-trigger-snap" style="border-radius: 50%; width: 64px; height: 64px; padding: 0;">
+                        <button class="btn btn-primary" id="btn-trigger-snap" style="border-radius: 50%; width: 64px; height: 64px; padding: 0; display:flex; justify-content:center; align-items:center; box-shadow: 0 0 15px rgba(6,182,212,0.4);">
                             <i class="fa-solid fa-camera" style="font-size: 1.5rem;"></i>
                         </button>
+
+                        <!-- Double Camera Toggle Checkbox -->
+                        <label class="double-camera-toggle" title="เปิดโหมดถ่ายภาพคู่ หน้า+หลัง" style="display:flex; flex-direction:column; align-items:center; cursor:pointer; gap: 4px;">
+                            <input type="checkbox" id="cb-double-camera" style="display:none;">
+                            <span class="double-cam-icon-btn" id="double-cam-indicator" style="border: 2px solid rgba(255,255,255,0.2); border-radius: 50%; width: 48px; height: 48px; display:flex; justify-content:center; align-items:center; background:rgba(255,255,255,0.05); color:var(--text-muted); transition: all 0.3s ease;">
+                                <i class="fa-solid fa-images" style="font-size: 1.2rem;"></i>
+                            </span>
+                            <span style="font-size: 0.65rem; color: var(--text-muted); font-weight:500;" id="double-cam-text">กล้องเดี่ยว</span>
+                        </label>
                     </div>
                 </div>
 
@@ -612,6 +635,24 @@
 
     <!-- HIDDEN COMPILED PRINT REPORT CONTAINER -->
     <div id="print-report-container" style="display:none;"></div>
+
+    <!-- MODAL 3: FULLSCREEN ALARM SIREN ALERTER (นาฬิกาปลุก) -->
+    <div class="modal-backdrop alarm-modal-backdrop" id="alarm-siren-modal" style="z-index: 9999;">
+        <div class="alarm-card glass-card" style="text-align: center; max-width: 420px; padding: 2.5rem 2rem; border-color: rgba(239, 68, 68, 0.4); box-shadow: 0 0 30px rgba(239, 68, 68, 0.25);">
+            <div class="alarm-glow-ring"></div>
+            <div class="alarm-icon-container" style="margin: 0 auto 1.5rem; width: 80px; height: 80px; border-radius: 50%; display: flex; justify-content:center; align-items:center; background: rgba(239,68,68,0.15); border: 2px solid var(--color-red);">
+                <i class="fa-solid fa-bell alarm-bell-icon pulse-bell" style="font-size: 2.5rem; color: var(--color-red);"></i>
+            </div>
+            <h2 style="font-family:'Prompt'; font-weight:700; font-size:1.4rem; color:#fff; margin-bottom:0.75rem;">ได้เวลาสแกนนิ้วบันทึกพยานแล้ว!</h2>
+            <p class="alarm-subtext" style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1.5rem; line-height:1.5;">แอปแจ้งเตือนเมื่อถึงกำหนดเวลา กรุณากดยืนยันบันทึกพยานในระบบ TimeWitness ตอนนี้</p>
+            <div class="alarm-time-now" id="alarm-time-now-display" style="font-family:'Outfit'; font-size: 3.5rem; font-weight: 800; color: var(--color-red); margin-bottom: 1.5rem; letter-spacing: 2px; text-shadow: 0 0 10px rgba(239,68,68,0.3);">12:00</div>
+            <div class="alarm-action-buttons">
+                <button class="btn btn-primary btn-dismiss-alarm" id="btn-dismiss-alarm" style="background: linear-gradient(135deg, var(--color-red), #b91c1c); width: 100%; border: none; padding: 0.85rem; font-weight: 600; border-radius: 8px;">
+                    <i class="fa-solid fa-volume-xmark" style="margin-right:8px;"></i> ปิดเสียงปลุกแจ้งเตือน
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- Main javascript logic code -->
     <script src="app.js"></script>
