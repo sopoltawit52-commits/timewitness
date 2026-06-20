@@ -215,7 +215,7 @@
                                     reg.update().then(() => {
                                         setTimeout(() => {
                                             if (!reg.waiting && !reg.installing) {
-                                                showToast("เวอร์ชันล่าสุดแล้ว", "แอปพลิเคชันของคุณเป็นรุ่นปรับปรุงล่าสุดแล้ว (v1.3.0)", "success");
+                                                showToast("เวอร์ชันล่าสุดแล้ว", "แอปพลิเคชันของคุณเป็นรุ่นปรับปรุงล่าสุดแล้ว (v1.7.0)", "success");
                                             }
                                         }, 1500);
                                     });
@@ -608,28 +608,57 @@
                 stepPrompt.style.display = 'none';
             }
 
-            // Start webcam video streams
+            // Start webcam video streams with robust mobile fallback
             if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: self.currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
-                    audio: false
-                })
-                .then(stream => {
-                    activeCameraStream = stream;
-                    video.srcObject = stream;
-                    video.style.display = 'block';
-                    placeholder.style.display = 'none';
-                })
-                .catch(err => {
-                    console.error("Camera access error:", err);
-                    loadingMsg.innerHTML = `<span style="color:var(--color-red);"><i class="fa-solid fa-triangle-exclamation"></i> ไม่สามารถเปิดกล้องได้ (กรุณาอนุญาตใช้กล้อง)</span>`;
-                    
-                    // Fallback simulated camera canvas drawing
-                    setTimeout(() => {
-                        self.drawSimulatedSelfiePlaceholder();
+                const constraintsList = [
+                    // Try with facingMode and standard resolution
+                    { facingMode: self.currentFacingMode, width: { ideal: 1280 }, height: { ideal: 720 } },
+                    // Try with facingMode only
+                    { facingMode: self.currentFacingMode },
+                    // Try with ideal facingMode
+                    { facingMode: { ideal: self.currentFacingMode } },
+                    // Basic video constraint
+                    true
+                ];
+
+                const tryCamera = (index) => {
+                    if (index >= constraintsList.length) {
+                        loadingMsg.innerHTML = `<span style="color:var(--color-red);"><i class="fa-solid fa-triangle-exclamation"></i> ไม่สามารถเปิดกล้องได้ (กรุณาอนุญาตใช้กล้อง)</span>`;
+                        setTimeout(() => {
+                            self.drawSimulatedSelfiePlaceholder();
+                            placeholder.style.display = 'none';
+                        }, 1500);
+                        return;
+                    }
+
+                    navigator.mediaDevices.getUserMedia({
+                        video: constraintsList[index],
+                        audio: false
+                    })
+                    .then(stream => {
+                        activeCameraStream = stream;
+                        video.srcObject = stream;
+                        
+                        // Set attributes for compatibility
+                        video.setAttribute('playsinline', 'true');
+                        video.setAttribute('autoplay', 'true');
+                        video.setAttribute('muted', 'true');
+                        
+                        video.style.display = 'block';
                         placeholder.style.display = 'none';
-                    }, 1000);
-                });
+
+                        // Explicit play call for mobile browsers
+                        video.play().catch(playErr => {
+                            console.warn("Video play interrupted/blocked:", playErr);
+                        });
+                    })
+                    .catch(err => {
+                        console.warn(`Camera constraints index ${index} failed, trying next:`, err);
+                        tryCamera(index + 1);
+                    });
+                };
+
+                tryCamera(0);
             } else {
                 loadingMsg.textContent = "ระบบเบราว์เซอร์ไม่รองรับกล้องถ่ายรูป";
                 setTimeout(() => {

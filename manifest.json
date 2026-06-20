@@ -9,14 +9,14 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "https://api.dicebear.com/7.x/bottts/svg?seed=TimeWitness",
+      "src": "./icon-192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml"
+      "type": "image/png"
     },
     {
-      "src": "https://api.dicebear.com/7.x/bottts/svg?seed=TimeWitness",
+      "src": "./icon-512.png",
       "sizes": "512x512",
-      "type": "image/svg+xml"
+      "type": "image/png"
     }
   ]
 }
