@@ -196,11 +196,41 @@
         },
 
         registerServiceWorker: function () {
+            const self = this;
             if ('serviceWorker' in navigator) {
                 window.addEventListener('load', () => {
                     navigator.serviceWorker.register('./service-worker.js')
-                        .then(reg => console.log('[Service Worker] Registered successfully:', reg.scope))
+                        .then(reg => {
+                            console.log('[Service Worker] Registered successfully:', reg.scope);
+                            
+                            // Check for updates
+                            self.checkServiceWorkerUpdate(reg);
+                            
+                            // Check if update button clicked
+                            const checkUpdateBtn = document.getElementById('btn-check-app-update');
+                            if (checkUpdateBtn) {
+                                checkUpdateBtn.addEventListener('click', () => {
+                                    showToast("กำลังตรวจสอบ...", "กำลังดึงข้อมูลเช็คความอัปเดตระบบแอป...", "info", 2000);
+                                    reg.update().then(() => {
+                                        setTimeout(() => {
+                                            if (!reg.waiting && !reg.installing) {
+                                                showToast("เวอร์ชันล่าสุดแล้ว", "แอปพลิเคชันของคุณเป็นรุ่นปรับปรุงล่าสุดแล้ว (v1.3.0)", "success");
+                                            }
+                                        }, 1500);
+                                    });
+                                });
+                            }
+                        })
                         .catch(err => console.error('[Service Worker] Registration failed:', err));
+                });
+
+                // Listen for controllerchange (refresh the page when new service worker takes control)
+                let refreshing = false;
+                navigator.serviceWorker.addEventListener('controllerchange', () => {
+                    if (!refreshing) {
+                        refreshing = true;
+                        window.location.reload();
+                    }
                 });
             }
 
@@ -208,6 +238,14 @@
             if ('Notification' in window && Notification.permission === 'default') {
                 Notification.requestPermission().then(permission => {
                     console.log('[Notification] Permission:', permission);
+                });
+            }
+
+            // Bind PWA update banner button
+            const btnReload = document.getElementById('btn-reload-pwa-update');
+            if (btnReload) {
+                btnReload.addEventListener('click', () => {
+                    self.activateWaitingServiceWorker();
                 });
             }
         },
@@ -314,6 +352,58 @@
                 document.body.classList.remove('printing-single-receipt');
             });
             document.getElementById('btn-download-receipt-image').addEventListener('click', () => self.downloadReceiptImage());
+
+            // PWA Install triggers
+            const triggerPwaInstall = () => {
+                if (self.deferredPrompt) {
+                    self.deferredPrompt.prompt();
+                    self.deferredPrompt.userChoice.then((choiceResult) => {
+                        if (choiceResult.outcome === 'accepted') {
+                            console.log('User accepted PWA install prompt');
+                            // Hide install UI
+                            const sidebarContainer = document.getElementById('sidebar-install-container');
+                            const settingsBtn = document.getElementById('btn-install-pwa-settings');
+                            const statusText = document.getElementById('pwa-install-status-text');
+                            if (sidebarContainer) sidebarContainer.style.display = 'none';
+                            if (settingsBtn) settingsBtn.style.display = 'none';
+                            if (statusText) statusText.textContent = "ติดตั้งสำเร็จเรียบร้อยแล้ว";
+                        }
+                        self.deferredPrompt = null;
+                    });
+                }
+            };
+
+            const btnInstallSidebar = document.getElementById('btn-install-pwa-sidebar');
+            if (btnInstallSidebar) {
+                btnInstallSidebar.addEventListener('click', triggerPwaInstall);
+            }
+            const btnInstallSettings = document.getElementById('btn-install-pwa-settings');
+            if (btnInstallSettings) {
+                btnInstallSettings.addEventListener('click', triggerPwaInstall);
+            }
+
+            // Window PWA events
+            window.addEventListener('beforeinstallprompt', (e) => {
+                e.preventDefault();
+                self.deferredPrompt = e;
+                // Show install UI
+                const sidebarContainer = document.getElementById('sidebar-install-container');
+                const settingsBtn = document.getElementById('btn-install-pwa-settings');
+                const statusText = document.getElementById('pwa-install-status-text');
+                if (sidebarContainer) sidebarContainer.style.display = 'block';
+                if (settingsBtn) settingsBtn.style.display = 'block';
+                if (statusText) statusText.textContent = "พร้อมติดตั้งแอปพลิเคชัน";
+            });
+
+            window.addEventListener('appinstalled', (evt) => {
+                console.log('TimeWitness PWA was installed successfully');
+                const sidebarContainer = document.getElementById('sidebar-install-container');
+                const settingsBtn = document.getElementById('btn-install-pwa-settings');
+                const statusText = document.getElementById('pwa-install-status-text');
+                if (sidebarContainer) sidebarContainer.style.display = 'none';
+                if (settingsBtn) settingsBtn.style.display = 'none';
+                if (statusText) statusText.textContent = "ติดตั้งสำเร็จเรียบร้อยแล้ว (Standalone Mode)";
+            });
         },
 
         // Realtime clocks
@@ -1592,6 +1682,67 @@
 
             // Check every 25 seconds
             setInterval(checkAlarms, 25000);
+        },
+
+        deferredPrompt: null,
+        activeServiceWorkerReg: null,
+
+        checkServiceWorkerUpdate: function (reg) {
+            const self = this;
+            self.activeServiceWorkerReg = reg;
+
+            // If there's already a waiting worker, show update banner
+            if (reg.waiting) {
+                self.showUpdateBanner();
+                return;
+            }
+
+            // If a new worker is installing, listen for status changes
+            if (reg.installing) {
+                self.trackInstallingServiceWorker(reg.installing);
+                return;
+            }
+
+            // Listen for updates found
+            reg.addEventListener('updatefound', () => {
+                const newWorker = reg.installing;
+                self.trackInstallingServiceWorker(newWorker);
+            });
+        },
+
+        trackInstallingServiceWorker: function (worker) {
+            const self = this;
+            worker.addEventListener('statechange', () => {
+                if (worker.state === 'installed') {
+                    if (navigator.serviceWorker.controller) {
+                        // New content is available, show banner!
+                        self.showUpdateBanner();
+                    }
+                }
+            });
+        },
+
+        showUpdateBanner: function () {
+            const banner = document.getElementById('pwa-update-banner');
+            if (banner) {
+                banner.style.display = 'flex';
+            }
+        },
+
+        activateWaitingServiceWorker: function () {
+            const self = this;
+            if (self.activeServiceWorkerReg && self.activeServiceWorkerReg.waiting) {
+                self.activeServiceWorkerReg.waiting.postMessage({ action: 'skipWaiting' });
+            } else {
+                // Fallback if reference lost
+                navigator.serviceWorker.getRegistration().then(reg => {
+                    if (reg && reg.waiting) {
+                        reg.waiting.postMessage({ action: 'skipWaiting' });
+                    } else {
+                        window.location.reload();
+                    }
+                });
+            }
         }
     };
 

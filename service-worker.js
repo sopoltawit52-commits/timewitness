@@ -79,3 +79,10 @@ self.addEventListener('push', event => {
         self.registration.showNotification(data.title, options)
     );
 });
+
+// Skip waiting message trigger
+self.addEventListener('message', event => {
+    if (event.data && event.data.action === 'skipWaiting') {
+        self.skipWaiting();
+    }
+});

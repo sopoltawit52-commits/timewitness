@@ -66,8 +66,15 @@
                 </a>
             </nav>
 
-            <div class="app-footer-brand">
-                <p>TimeWitness v1.2.0</p>
+            <div class="sidebar-install-box" id="sidebar-install-container" style="display:none; padding:1.2rem; margin-top:auto; border-top:1px solid rgba(255,255,255,0.05); text-align:center;">
+                <p style="font-size:0.7rem; color:var(--text-muted); margin-bottom:0.6rem;">เข้าใช้งาน PWA สะดวกกว่า</p>
+                <button class="btn btn-primary" id="btn-install-pwa-sidebar" style="width:100%; font-size:0.78rem; padding: 8px; background: linear-gradient(135deg, var(--color-cyan), var(--color-purple));">
+                    <i class="fa-solid fa-download"></i> ติดตั้งแอปเครื่องนี้
+                </button>
+            </div>
+
+            <div class="app-footer-brand" style="margin-top: 1rem;">
+                <p>TimeWitness v1.3.0</p>
                 <span>เก็บบันทึกบนเครื่องคุณ 100%</span>
             </div>
         </aside>
@@ -405,10 +412,33 @@
                                     เปิดเสียงสัญญาณไซเรนสั้น (Alarm Beep Sound) เมื่อถึงเวลาเตือน
                                 </label>
                             </div>
-                            <button type="button" class="btn btn-primary" id="btn-save-alarms">
-                                <i class="fa-solid fa-bell-concierge"></i> บันทึกเวลาแจ้งเตือน
-                            </button>
-                        </form>
+                    </div>
+
+                    <!-- System Info & Updates Settings Card -->
+                    <div class="card glass-card" style="grid-column: span 2;">
+                        <h3><i class="fa-solid fa-circle-info"></i> ข้อมูลระบบแอปพลิเคชันและการอัปเดต</h3>
+                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:1.5rem; align-items: center;">
+                            <div style="display:flex; flex-direction:column; gap:0.5rem;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:0.4rem;">
+                                    <span style="font-size:0.85rem; color:var(--text-muted);">เวอร์ชันปัจจุบัน:</span>
+                                    <span style="font-size:0.9rem; font-weight:700; color:var(--color-cyan);" id="app-version-display">v1.3.0</span>
+                                </div>
+                                <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid rgba(255,255,255,0.05); padding-bottom:0.4rem;">
+                                    <span style="font-size:0.85rem; color:var(--text-muted);">สถานะแอปพลิเคชัน:</span>
+                                    <span style="font-size:0.85rem; font-weight:600;" id="pwa-install-status-text">พร้อมใช้งานบนเบราว์เซอร์</span>
+                                </div>
+                            </div>
+                            <div style="display:flex; gap:0.8rem; flex-wrap:wrap;">
+                                <!-- Install Button inside Settings -->
+                                <button type="button" class="btn btn-primary" id="btn-install-pwa-settings" style="flex:1; display:none; background: linear-gradient(135deg, var(--color-cyan), var(--color-purple)); font-weight:600; padding:0.6rem;">
+                                    <i class="fa-solid fa-download" style="margin-right:6px;"></i> ติดตั้งแอป PWA
+                                </button>
+                                <!-- Check Update Button -->
+                                <button type="button" class="btn btn-secondary" id="btn-check-app-update" style="flex:1; font-weight:600; padding:0.6rem; border:1px solid rgba(255,255,255,0.1);">
+                                    <i class="fa-solid fa-rotate" style="margin-right:6px;"></i> ตรวจเช็กเวอร์ชันล่าสุด
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -652,6 +682,18 @@
                 </button>
             </div>
         </div>
+    </div>
+
+    <!-- UPDATE BANNER FOR PWA -->
+    <div class="update-banner" id="pwa-update-banner" style="display:none; position:fixed; bottom:80px; left:50%; transform:translateX(-50%); background:rgba(15,23,42,0.98); border:1px solid var(--color-cyan); padding:14px 20px; border-radius:12px; z-index:9999; box-shadow:0 12px 30px rgba(0,0,0,0.65); align-items:center; gap:16px; width:90%; max-width:420px; border-left: 4px solid var(--color-cyan);">
+        <div style="color:var(--color-cyan); font-size:1.4rem; display:flex; align-items:center;"><i class="fa-solid fa-sparkles"></i></div>
+        <div style="flex:1; display:flex; flex-direction:column; gap:2px;">
+            <h5 style="font-family:'Prompt', sans-serif; font-weight:600; color:#fff; font-size:0.85rem; margin:0;">มีรุ่นปรับปรุงเวอร์ชันใหม่ล่าสุด!</h5>
+            <p style="font-size:0.75rem; color:var(--text-muted); margin:0; font-family:'Prompt', sans-serif;">กดอัปเดตเพื่อเปิดใช้งานคุณสมบัติใหม่ทันที</p>
+        </div>
+        <button class="btn btn-primary btn-sm" id="btn-reload-pwa-update" style="padding:6px 12px; font-size:0.78rem; font-weight:600; background:var(--color-cyan); color:#000; border:none; border-radius:6px; cursor:pointer;">
+            อัปเดตตอนนี้
+        </button>
     </div>
 
     <!-- Main javascript logic code -->
