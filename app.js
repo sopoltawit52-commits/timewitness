@@ -193,6 +193,7 @@
             this.loadTodayStatus();
             this.renderHistory();
             this.initNotificationsEngine();
+            this.initInstallUI();
         },
 
         registerServiceWorker: function () {
@@ -370,6 +371,8 @@
                         }
                         self.deferredPrompt = null;
                     });
+                } else {
+                    self.openInstallGuideModal();
                 }
             };
 
@@ -380,6 +383,15 @@
             const btnInstallSettings = document.getElementById('btn-install-pwa-settings');
             if (btnInstallSettings) {
                 btnInstallSettings.addEventListener('click', triggerPwaInstall);
+            }
+
+            const btnCloseGuide = document.getElementById('btn-close-install-guide');
+            if (btnCloseGuide) {
+                btnCloseGuide.addEventListener('click', () => self.closeInstallGuideModal());
+            }
+            const btnCloseGuideModal = document.getElementById('btn-close-install-guide-modal');
+            if (btnCloseGuideModal) {
+                btnCloseGuideModal.addEventListener('click', () => self.closeInstallGuideModal());
             }
 
             // Window PWA events
@@ -1743,6 +1755,33 @@
                     }
                 });
             }
+        },
+
+        initInstallUI: function () {
+            const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+            const sidebarContainer = document.getElementById('sidebar-install-container');
+            const settingsBtn = document.getElementById('btn-install-pwa-settings');
+            const statusText = document.getElementById('pwa-install-status-text');
+
+            if (!isStandalone) {
+                if (sidebarContainer) sidebarContainer.style.display = 'block';
+                if (settingsBtn) settingsBtn.style.display = 'block';
+                if (statusText) statusText.textContent = "พร้อมติดตั้งบนเครื่องคุณ";
+            } else {
+                if (sidebarContainer) sidebarContainer.style.display = 'none';
+                if (settingsBtn) settingsBtn.style.display = 'none';
+                if (statusText) statusText.textContent = "ติดตั้งสำเร็จเรียบร้อยแล้ว (Standalone Mode)";
+            }
+        },
+
+        openInstallGuideModal: function () {
+            const modal = document.getElementById('install-guide-modal');
+            if (modal) modal.classList.add('active');
+        },
+
+        closeInstallGuideModal: function () {
+            const modal = document.getElementById('install-guide-modal');
+            if (modal) modal.classList.remove('active');
         }
     };
 
