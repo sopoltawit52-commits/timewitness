@@ -1,4 +1,4 @@
-const CACHE_NAME = 'timewitness-v1';
+const CACHE_NAME = 'timewitness-v1.4';
 const ASSETS = [
     './',
     './index.html',
