@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="TimeWitness - แอปเก็บบันทึกพยานหลักฐานการลงเวลาทำงานส่วนบุคคลสำหรับพนักงาน">
+    <!-- PWA Settings -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#090d16">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="TimeWitness">
+    
+    <title>TimeWitness - ระบบพยานบันทึกเวลาทำงานส่วนบุคคล</title>
+    <!-- Google Fonts: Prompt & Outfit for modern UI styling -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for high-quality premium icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS stylesheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Backdrop glowing color design -->
+    <div class="glow-bg">
+        <div class="blob blob-purple"></div>
+        <div class="blob blob-cyan"></div>
+        <div class="blob blob-amber"></div>
+    </div>
+
+    <div class="app-container">
+        <!-- Sidebar Navigation (Desktop only) -->
+        <aside class="sidebar" id="app-sidebar">
+            <div class="logo-area">
+                <i class="fa-solid fa-shield-halved logo-icon"></i>
+                <div class="logo-text">
+                    <h1>TimeWitness</h1>
+                    <span>Personal Backup Proof</span>
+                </div>
+            </div>
+            
+            <div class="profile-card">
+                <div class="avatar-container">
+                    <img id="user-avatar" src="https://api.dicebear.com/7.x/bottts/svg?seed=user" alt="User Avatar">
+                    <span class="status-indicator online"></span>
+                </div>
+                <div class="profile-info">
+                    <h3 id="user-display-name">ผู้ใช้บันทึกหลักฐาน</h3>
+                    <p id="user-role-badge">ID: TW-USER</p>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <a href="#dashboard" class="nav-link active" data-target="dashboard">
+                    <i class="fa-solid fa-fingerprint"></i> <span>ลงพยานหลักฐาน</span>
+                </a>
+                <a href="#history" class="nav-link" data-target="history">
+                    <i class="fa-solid fa-box-archive"></i> <span>คลังหลักฐานทั้งหมด</span>
+                </a>
+                <a href="#calendar" class="nav-link" data-target="calendar">
+                    <i class="fa-solid fa-calendar-check"></i> <span>ปฏิทินตรวจสอบ</span>
+                </a>
+                <a href="#settings" class="nav-link" data-target="settings">
+                    <i class="fa-solid fa-sliders"></i> <span>ตั้งค่าส่วนตัว</span>
+                </a>
+            </nav>
+
+            <div class="app-footer-brand">
+                <p>TimeWitness v1.2.0</p>
+                <span>เก็บบันทึกบนเครื่องคุณ 100%</span>
+            </div>
+        </aside>
+
+        <!-- Main Workspace -->
+        <main class="main-content">
+            <!-- Mobile Header Bar -->
+            <header class="mobile-header">
+                <div class="logo-area-mobile">
+                    <i class="fa-solid fa-shield-halved logo-icon"></i>
+                    <h2>TimeWitness</h2>
+                </div>
+                <div class="mobile-user-status">
+                    <span class="gps-dot active" id="mobile-gps-status-dot" title="GPS Status"></span>
+                    <span class="network-badge" id="mobile-net-status">Online</span>
+                </div>
+            </header>
+
+            <!-- VIEW 1: Dashboard / Recording -->
+            <div class="view-panel active" id="view-dashboard">
+                <div class="welcome-banner">
+                    <div class="welcome-text">
+                        <h2>บันทึกเวลา & ถ่ายภาพเป็นพยาน</h2>
+                        <p>เซฟข้อมูลพิกัด GPS จริงและรูปสแกนนิ้วสำรองไว้ในเครื่องของคุณเมื่อสแกนนิ้วบริษัท</p>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid">
+                    <!-- Main Recording Dashboard Card -->
+                    <section class="card glass-card clock-card">
+                        <div class="digital-clock-container">
+                            <div class="clock-time" id="clock-time-display">00:00:00</div>
+                            <div class="clock-date" id="clock-day-display">SATURDAY</div>
+                        </div>
+
+                        <!-- 4-step selector showing current daily actions -->
+                        <div class="stepper-container">
+                            <div class="step-progress-bar">
+                                <div class="step-progress-fill" id="stepper-fill"></div>
+                            </div>
+                            <div class="step-node" id="step-node-1" data-step="1">
+                                <div class="step-circle"><i class="fa-solid fa-arrow-right-to-bracket"></i></div>
+                                <span class="step-label">เข้างาน</span>
+                                <span class="step-time" id="step-time-1">-</span>
+                            </div>
+                            <div class="step-node" id="step-node-2" data-step="2">
+                                <div class="step-circle"><i class="fa-solid fa-utensils"></i></div>
+                                <span class="step-label">ออกพัก</span>
+                                <span class="step-time" id="step-time-2">-</span>
+                            </div>
+                            <div class="step-node" id="step-node-3" data-step="3">
+                                <div class="step-circle"><i class="fa-solid fa-briefcase"></i></div>
+                                <span class="step-label">กลับเข้างาน</span>
+                                <span class="step-time" id="step-time-3">-</span>
+                            </div>
+                            <div class="step-node" id="step-node-4" data-step="4">
+                                <div class="step-circle"><i class="fa-solid fa-arrow-right-from-bracket"></i></div>
+                                <span class="step-label">ออกงาน</span>
+                                <span class="step-time" id="step-time-4">-</span>
+                            </div>
+                        </div>
+
+                        <!-- Active status of GPS coordinates -->
+                        <div class="location-status-bar" id="dashboard-gps-status">
+                            <i class="fa-solid fa-location-crosshairs location-pin-icon pulse-animation"></i>
+                            <span id="gps-status-text">กำลังตรวจสอบพิกัด GPS จริง...</span>
+                        </div>
+
+                        <!-- Main Logging Actions -->
+                        <div class="clock-action-panel">
+                            <!-- Work Mode selector (where are you scanning) -->
+                            <div class="work-mode-container">
+                                <span class="mode-label">สถานที่บันทึก:</span>
+                                <div class="mode-switch-group">
+                                    <label class="mode-btn active" id="mode-office">
+                                        <input type="radio" name="work_mode" value="Office" checked>
+                                        <i class="fa-solid fa-building"></i> ออฟฟิศ
+                                    </label>
+                                    <label class="mode-btn" id="mode-wfh">
+                                        <input type="radio" name="work_mode" value="WFH">
+                                        <i class="fa-solid fa-house-user"></i> บ้าน (WFH)
+                                    </label>
+                                    <label class="mode-btn" id="mode-field">
+                                        <input type="radio" name="work_mode" value="Field">
+                                        <i class="fa-solid fa-map-location-dot"></i> นอกสถานที่
+                                    </label>
+                                </div>
+                            </div>
+
+                            <!-- Mega Touch Logging Fingerprint Button -->
+                            <button class="btn btn-primary btn-punch" id="punch-main-btn">
+                                <div class="punch-btn-content">
+                                    <i class="fa-solid fa-shield-check punch-finger-icon"></i>
+                                    <span id="punch-btn-label">กดบันทึกพยานหลักฐาน</span>
+                                </div>
+                                <span class="pulse-ring"></span>
+                            </button>
+                        </div>
+                    </section>
+
+                    <!-- Sidebar quick summary widgets -->
+                    <section class="dashboard-sidebar-grid">
+                        <div class="card glass-card stat-quick-card">
+                            <h3><i class="fa-solid fa-file-invoice"></i> สรุปหลักฐานวันนี้</h3>
+                            <div class="quick-stats-container">
+                                <div class="quick-stat-item">
+                                    <span class="q-label">จำนวนการสแกนนิ้วที่เซฟไว้</span>
+                                    <span class="q-val text-cyan" id="quick-logs-count">0 / 4 ครั้ง</span>
+                                </div>
+                                <div class="quick-stat-item">
+                                    <span class="q-label">สแกนเข้างานจริง</span>
+                                    <span class="q-val text-green" id="quick-checkin-time">-</span>
+                                </div>
+                                <div class="quick-stat-item">
+                                    <span class="q-label">ระยะเวลาพักกลางวัน</span>
+                                    <span class="q-val text-amber" id="quick-break-time">-</span>
+                                </div>
+                                <div class="quick-stat-item">
+                                    <span class="q-label">สแกนออกงานจริง</span>
+                                    <span class="q-val text-red" id="quick-checkout-time">-</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Manual triggers for alarm demonstration -->
+                        <div class="card glass-card notification-demo-card">
+                            <h3><i class="fa-solid fa-circle-info"></i> แจ้งเตือนสแกนนิ้วกันลืม</h3>
+                            <p class="demo-tip">แอปจะส่งสัญญาณเตือนในโทรศัพท์ของคุณตามเวลาเข้า-ออกงาน เพื่อไม่ให้คุณลืมกดยืนยันพยานปากสำคัญ</p>
+                            <div class="demo-actions-grid">
+                                <button class="btn btn-secondary btn-sm" id="btn-trigger-test-alarm">
+                                    <i class="fa-solid fa-volume-high"></i> ทดสอบส่งเสียงแจ้งเตือน
+                                </button>
+                                <button class="btn btn-outline btn-sm" id="btn-clear-today-logs" style="border-color:var(--color-red); color:var(--color-red);">
+                                    <i class="fa-solid fa-trash-can"></i> ล้างข้อมูลบันทึกวันนี้
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <!-- VIEW 2: Evidence History Locker -->
+            <div class="view-panel" id="view-history">
+                <div class="section-title-row">
+                    <div>
+                        <h2><i class="fa-solid fa-box-archive"></i> คลังเก็บพยานหลักฐานทั้งหมด</h2>
+                        <p>รวบรวมพิกัด แผนที่ และภาพถ่ายสแกนนิ้วลายน้ำที่ดาวน์โหลดและนำไปแสดงเป็นพยานได้</p>
+                    </div>
+                    <div class="history-actions-row" style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                        <button class="btn btn-secondary" id="export-history-csv-btn">
+                            <i class="fa-solid fa-file-csv"></i> ส่งออกประวัติ CSV
+                        </button>
+                        <button class="btn btn-primary" id="btn-export-pdf-report" style="background: linear-gradient(135deg, var(--color-purple), var(--color-red));">
+                            <i class="fa-solid fa-file-pdf"></i> พิมพ์รายงาน PDF (รวมรูปถ่าย)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="card glass-card filter-card">
+                    <div class="filter-grid">
+                        <div class="filter-item">
+                            <label for="filter-start-date">ตั้งแต่วันที่:</label>
+                            <input type="date" id="filter-start-date" class="form-control">
+                        </div>
+                        <div class="filter-item">
+                            <label for="filter-end-date">ถึงวันที่:</label>
+                            <input type="date" id="filter-end-date" class="form-control">
+                        </div>
+                        <div class="filter-item">
+                            <label for="filter-scan-type">ประเภทการสแกน:</label>
+                            <select id="filter-scan-type" class="form-control">
+                                <option value="all">ทั้งหมด</option>
+                                <option value="1">เข้างาน (Check-In)</option>
+                                <option value="2">ออกพักเที่ยง (Break Out)</option>
+                                <option value="3">กลับเข้างาน (Break In)</option>
+                                <option value="4">ออกงาน (Check-Out)</option>
+                            </select>
+                        </div>
+                        <div class="filter-item btn-align">
+                            <button class="btn btn-primary" id="btn-apply-filters">ค้นหา</button>
+                            <button class="btn btn-outline" id="btn-reset-filters">ล้างค่า</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Desktop Table List -->
+                <div class="card glass-card table-responsive-wrapper desktop-only">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>วันเวลาที่บันทึกพยาน</th>
+                                <th>ประเภทการลงเวลา</th>
+                                <th>สถานที่</th>
+                                <th>พิกัดจริง (GPS)</th>
+                                <th>ความแม่นยำ</th>
+                                <th>เครือข่าย</th>
+                                <th>ภาพถ่ายพยานลายน้ำ</th>
+                                <th>ใบสำคัญพยานหลักฐาน</th>
+                            </tr>
+                        </thead>
+                        <tbody id="history-table-body">
+                            <!-- Dynamic Content -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Mobile cards container -->
+                <div class="mobile-history-cards-container mobile-only" id="history-mobile-cards">
+                    <!-- Dynamic Mobile Cards -->
+                </div>
+            </div>
+
+            <!-- VIEW 3: Calendar Status Tracker -->
+            <div class="view-panel" id="view-calendar">
+                <div class="section-title-row">
+                    <div>
+                        <h2><i class="fa-solid fa-calendar-check"></i> ปฏิทินตรวจเช็กความครบถ้วนของหลักฐาน</h2>
+                        <p>เช็กสถิติว่าวันไหนเก็บบันทึกประวัติสแกนนิ้วไว้ครบถ้วนบ้าง เพื่อใช้เทียบกับใบสลิปเงินเดือน/สถิติของ HR ปลายเดือน</p>
+                    </div>
+                </div>
+
+                <div class="calendar-layout-grid">
+                    <div class="card glass-card calendar-card-wrapper">
+                        <div class="calendar-header-controls">
+                            <button class="btn-icon" id="cal-prev-month-btn"><i class="fa-solid fa-chevron-left"></i></button>
+                            <h3 id="cal-month-title">มิถุนายน 2569</h3>
+                            <button class="btn-icon" id="cal-next-month-btn"><i class="fa-solid fa-chevron-right"></i></button>
+                        </div>
+                        
+                        <div class="calendar-week-headers">
+                            <span>อา.</span><span>จ.</span><span>อ.</span><span>พ.</span><span>พฤ.</span><span>ศ.</span><span>ส.</span>
+                        </div>
+                        
+                        <div class="calendar-days-grid" id="calendar-days-container">
+                            <!-- Dynamic Days -->
+                        </div>
+                        
+                        <div class="calendar-legend">
+                            <span class="legend-item"><span class="legend-badge completion-4"></span> ครบถ้วน (4/4 สแกน)</span>
+                            <span class="legend-item"><span class="legend-badge completion-partial"></span> ข้อมูลบางส่วน (1-3 สแกน)</span>
+                            <span class="legend-item"><span class="legend-badge completion-0"></span> ไม่มีบันทึกหลักฐาน</span>
+                        </div>
+                    </div>
+
+                    <!-- Side Stats description -->
+                    <div class="card glass-card stats-calendar-sidebar">
+                        <h3><i class="fa-solid fa-chart-column"></i> สถิติข้อมูลพยานรายเดือน</h3>
+                        <div class="calendar-monthly-stats-box">
+                            <div class="month-stat-item">
+                                <span class="m-lbl">วันที่บันทึกหลักฐานครบ (4 ครั้ง)</span>
+                                <span class="m-val text-green" id="stat-days-complete">0 วัน</span>
+                            </div>
+                            <div class="month-stat-item">
+                                <span class="m-lbl">วันที่บันทึกข้อมูลบางส่วน</span>
+                                <span class="m-val text-amber" id="stat-days-partial">0 วัน</span>
+                            </div>
+                            <div class="month-stat-item">
+                                <span class="m-lbl">จำนวนรายการหลักฐานรูปภาพทั้งหมด</span>
+                                <span class="m-val text-cyan" id="stat-total-photos">0 รูปภาพ</span>
+                            </div>
+                            <div class="month-stat-item">
+                                <span class="m-lbl">อัตราความคลาดเคลื่อน GPS เฉลี่ย</span>
+                                <span class="m-val" id="stat-avg-accuracy">+/- 10 เมตร</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- VIEW 4: Personal Settings -->
+            <div class="view-panel" id="view-settings">
+                <div class="section-title-row">
+                    <div>
+                        <h2><i class="fa-solid fa-sliders"></i> ตั้งค่าข้อมูลส่วนตัวสำหรับการออกใบหลักฐาน</h2>
+                        <p>จัดการโปรไฟล์พนักงาน บริษัท และกะเวลาสำหรับแจ้งเตือนกดยืนยันพยานปากสำคัญ</p>
+                    </div>
+                </div>
+
+                <div class="settings-grid">
+                    <!-- Profile Info setting -->
+                    <div class="card glass-card">
+                        <h3><i class="fa-solid fa-user-gear"></i> ข้อมูลโปรไฟล์พนักงานจริงของคุณ</h3>
+                        <form id="settings-profile-form" onsubmit="event.preventDefault();">
+                            <div class="form-group">
+                                <label for="setting-emp-name">ชื่อ-นามสกุลพนักงาน:</label>
+                                <input type="text" id="setting-emp-name" class="form-control" value="สมชาย ใจดี" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="setting-emp-id">รหัสพนักงานของบริษัท (Employee ID):</label>
+                                <input type="text" id="setting-emp-id" class="form-control" value="EMP-69420" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="setting-emp-dept">แผนก / ตำแหน่ง:</label>
+                                <input type="text" id="setting-emp-dept" class="form-control" value="ฝ่ายปฏิบัติการคลังสินค้า" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="setting-emp-company">ชื่อบริษัท / สถานที่ทำงาน:</label>
+                                <input type="text" id="setting-emp-company" class="form-control" value="บริษัท โลจิสติกส์ พลัส จำกัด" required>
+                            </div>
+                            <button type="button" class="btn btn-primary" id="btn-save-profile">
+                                <i class="fa-solid fa-save"></i> บันทึกข้อมูลโปรไฟล์
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Work Shift limits for reminders -->
+                    <div class="card glass-card">
+                        <h3><i class="fa-solid fa-clock"></i> ตั้งค่ากะเวลาเพื่อส่งสัญญาณแจ้งเตือน</h3>
+                        <form id="settings-shift-form" onsubmit="event.preventDefault();">
+                            <div class="form-group">
+                                <label for="setting-alarm-checkin">เวลาแจ้งเตือนสแกนนิ้วเข้างาน (เช้า):</label>
+                                <input type="time" id="setting-alarm-checkin" class="form-control" value="08:45">
+                            </div>
+                            <div class="form-group">
+                                <label for="setting-alarm-lunch">เวลาแจ้งเตือนสแกนนิ้วออกพักเที่ยง:</label>
+                                <input type="time" id="setting-alarm-lunch" class="form-control" value="12:00">
+                            </div>
+                            <div class="form-group">
+                                <label for="setting-alarm-breakin">เวลาแจ้งเตือนสแกนนิ้วกลับทำงาน:</label>
+                                <input type="time" id="setting-alarm-breakin" class="form-control" value="12:55">
+                            </div>
+                            <div class="form-group">
+                                <label for="setting-alarm-checkout">เวลาแจ้งเตือนสแกนนิ้วเลิกงาน (เย็น):</label>
+                                <input type="time" id="setting-alarm-checkout" class="form-control" value="18:00">
+                            </div>
+                            <div class="form-group checkbox-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="setting-alert-sound" checked>
+                                    เปิดเสียงสัญญาณไซเรนสั้น (Alarm Beep Sound) เมื่อถึงเวลาเตือน
+                                </label>
+                            </div>
+                            <button type="button" class="btn btn-primary" id="btn-save-alarms">
+                                <i class="fa-solid fa-bell-concierge"></i> บันทึกเวลาแจ้งเตือน
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Mobile Bottom Navigation Tab bar -->
+        <nav class="mobile-bottom-nav">
+            <a href="#dashboard" class="mobile-nav-link active" data-target="dashboard">
+                <i class="fa-solid fa-fingerprint"></i>
+                <span>กดยืนยัน</span>
+            </a>
+            <a href="#history" class="mobile-nav-link" data-target="history">
+                <i class="fa-solid fa-box-archive"></i>
+                <span>คลังประวัติ</span>
+            </a>
+            <a href="#calendar" class="mobile-nav-link" data-target="calendar">
+                <i class="fa-solid fa-calendar-check"></i>
+                <span>ปฏิทิน</span>
+            </a>
+            <a href="#settings" class="mobile-nav-link" data-target="settings">
+                <i class="fa-solid fa-sliders"></i>
+                <span>ตั้งค่า</span>
+            </a>
+        </nav>
+    </div>
+
+    <!-- MODAL 1: REAL WEBCAM CAMERA CAPTURE AND WATERMARK GENERATION -->
+    <div class="modal-backdrop" id="camera-capture-modal">
+        <div class="modal-card glass-card">
+            <div class="modal-header">
+                <h3>ถ่ายรูปยืนยันตัวตนพร้อมระบุละติจูดจริง</h3>
+                <button class="modal-close-btn" id="btn-close-camera-modal"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <!-- HTML5 webcam element stream -->
+                <div class="camera-simulator-area">
+                    <div class="camera-preview-container">
+                        <!-- Camera guideline bounds -->
+                        <div class="camera-goggles-guide"></div>
+                        <video id="webcam-element" autoplay playsinline muted></video>
+                        <canvas id="photo-canvas" style="display:none;"></canvas>
+                        
+                        <div class="camera-placeholder" id="camera-loading-placeholder">
+                            <i class="fa-solid fa-circle-notch fa-spin camera-placeholder-icon"></i>
+                            <p id="camera-status-msg">กำลังเปิดกล้องหน้าโทรศัพท์...</p>
+                        </div>
+                    </div>
+                    
+                    <div class="camera-controls">
+                        <!-- Capture Button -->
+                        <button class="btn btn-primary" id="btn-trigger-snap" style="border-radius: 50%; width: 64px; height: 64px; padding: 0;">
+                            <i class="fa-solid fa-camera" style="font-size: 1.5rem;"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- GPS Info & Map -->
+                <div class="location-simulator-area">
+                    <div class="location-details-box">
+                        <i class="fa-solid fa-location-arrow location-pin-icon pulse-animation" id="modal-gps-pulse-icon"></i>
+                        <div>
+                            <h4>พิกัดจริงจากดาวเทียมเครื่องมือ</h4>
+                            <p id="modal-gps-text">ละติจูด: -, ลองจิจูด: - (กำลังหาพิกัด...)</p>
+                            <span id="modal-gps-accuracy" style="font-size:0.7rem; color:var(--text-muted);">คลาดเคลื่อน: - เมตร</span>
+                        </div>
+                    </div>
+                    
+                    <!-- Simulating map of scanned location -->
+                    <div class="mock-map-canvas" id="modal-mock-map">
+                        <div class="map-grid-pattern"></div>
+                        <div class="map-center-pin">
+                            <div class="sonar-wave"></div>
+                            <i class="fa-solid fa-location-dot" style="color:var(--color-cyan);"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Remarks -->
+                <div class="form-group remarks-field">
+                    <label for="punch-note-input">บันทึกช่วยจำเพิ่มเติม (เช่น เลขรอบที่สแกน, สแกนไม่ติดรอบที่ 2):</label>
+                    <input type="text" id="punch-note-input" class="form-control" placeholder="เช่น สแกนที่เครื่องเบอร์ 2 แล้วไม่ติด">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="btn-cancel-capture">ยกเลิก</button>
+                <button class="btn btn-primary" id="btn-confirm-attendance" disabled>
+                    <i class="fa-solid fa-shield-check"></i> ยืนยันบันทึกพยานหลักฐาน
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL 2: SHAREABLE OFFICIAL EVIDENCE RECEIPT CARD -->
+    <div class="modal-backdrop" id="receipt-modal">
+        <div class="modal-card glass-card" style="max-width: 580px;">
+            <div class="modal-header">
+                <h3>ใบสำคัญพยานหลักฐานการลงเวลางาน (Evidence Receipt)</h3>
+                <button class="modal-close-btn" id="btn-close-receipt-modal"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="modal-body" style="padding: 1rem;">
+                
+                <!-- THE ACTUAL RECEIPT CONTAINER FOR CAPTURE/PRINT -->
+                <div class="evidence-receipt-card" id="printable-evidence-card">
+                    <!-- Watermark background texture in card -->
+                    <div class="receipt-bg-seal"><i class="fa-solid fa-shield-halved"></i></div>
+                    
+                    <div class="receipt-header">
+                        <div class="receipt-header-left">
+                            <i class="fa-solid fa-shield-check receipt-badge-icon"></i>
+                            <div>
+                                <h2>TIMEWITNESS VERIFIED RECORD</h2>
+                                <p>เอกสารรับรองหลักฐานบันทึกเวลาทำงานส่วนบุคคล</p>
+                            </div>
+                        </div>
+                        <span class="receipt-status-badge">SECURED</span>
+                    </div>
+
+                    <div class="receipt-profile-row">
+                        <div class="profile-info-block">
+                            <span class="info-label">พนักงานผู้แสดงหลักฐาน:</span>
+                            <span class="info-val" id="rec-emp-name">-</span>
+                        </div>
+                        <div class="profile-info-block">
+                            <span class="info-label">รหัสพนักงาน:</span>
+                            <span class="info-val" id="rec-emp-id">-</span>
+                        </div>
+                        <div class="profile-info-block">
+                            <span class="info-label">แผนก/สังกัด:</span>
+                            <span class="info-val" id="rec-emp-dept">-</span>
+                        </div>
+                    </div>
+
+                    <div class="receipt-body-grid">
+                        <!-- Left col: Watermarked selfie proof -->
+                        <div class="receipt-photo-box">
+                            <img id="rec-photo-proof" src="" alt="Selfie proof with baked watermark">
+                        </div>
+
+                        <!-- Right col: detailed logs -->
+                        <div class="receipt-details-list">
+                            <div class="detail-row">
+                                <span class="d-label">วันที่ลงเวลาจริง:</span>
+                                <span class="d-val" id="rec-date">-</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="d-label">เวลาประทับเครื่อง:</span>
+                                <span class="d-val text-green" id="rec-time">-</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="d-label">ประเภทบันทึก:</span>
+                                <span class="d-val" id="rec-type">-</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="d-label">รูปแบบสถานที่:</span>
+                                <span class="d-val" id="rec-mode">-</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="d-label">พิกัดแผนที่ (GPS Coords):</span>
+                                <span class="d-val text-cyan" id="rec-coords">-</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="d-label">ความถูกต้องพิกัด:</span>
+                                <span class="d-val" id="rec-accuracy">-</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="d-label">ลิงก์ค้นหา Google Maps:</span>
+                                <a id="rec-maps-link" href="" target="_blank" class="d-val text-cyan" style="text-decoration: underline;">
+                                    <i class="fa-solid fa-map-location-dot"></i> เปิดดูบน Google Maps
+                                </a>
+                            </div>
+                            <div class="detail-row">
+                                <span class="d-label">เบราว์เซอร์/อุปกรณ์ที่ใช้:</span>
+                                <span class="d-val" id="rec-device" style="font-size:0.62rem; word-break: break-all;">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="receipt-footer">
+                        <div class="receipt-seal-area">
+                            <i class="fa-solid fa-stamp seal-stamp-icon"></i>
+                            <div>
+                                <p>TimeWitness Evidence Vault</p>
+                                <span>Hash SHA-256 Verified Local Signature</span>
+                            </div>
+                        </div>
+                        <div class="receipt-remark-bottom">
+                            <strong>บันทึกช่วยจำ:</strong> <span id="rec-remark">-</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="btn btn-outline" id="btn-print-receipt">
+                    <i class="fa-solid fa-print"></i> สั่งพิมพ์ / PDF
+                </button>
+                <button class="btn btn-primary" id="btn-download-receipt-image">
+                    <i class="fa-solid fa-download"></i> ดาวน์โหลดรูปใบสำคัญ (PNG)
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- TOAST REMINDERS WRAPPER -->
+    <div class="toast-container" id="toast-notifications-wrapper"></div>
+
+    <!-- HIDDEN COMPILED PRINT REPORT CONTAINER -->
+    <div id="print-report-container" style="display:none;"></div>
+
+    <!-- Main javascript logic code -->
+    <script src="app.js"></script>
+</body>
+</html>
